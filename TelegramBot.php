@@ -1,6 +1,6 @@
 <?php
-//classe che implementa la gestione del core del BOT
-abstract class TelegramBotCore {
+
+ abstract class TelegramBotCore {
 
   protected $host;
   protected $port;
@@ -127,7 +127,6 @@ abstract class TelegramBotCore {
     return $response;
   }
 
-//gestione del poll lento
   protected function longpoll() {
     $params = array(
       'limit' => $this->updatesLimit,
@@ -156,7 +155,6 @@ abstract class TelegramBotCore {
 
 }
 
-//Gestione del BOT
 class TelegramBot extends TelegramBotCore {
 
   protected $chatClass;
@@ -174,46 +172,140 @@ class TelegramBot extends TelegramBotCore {
 
   public function onUpdateReceived($update) {
     if ($update['message']) {
-      $message = $update['message'];
+      $text = $update['message'];
       $chat_id = intval($message['chat']['id']);
-      if ($chat_id) {
-        $chat = $this->getChatInstance($chat_id);
-        if (isset($message['group_chat_created'])) {
-          $chat->bot_added_to_chat($message);
-        } else if (isset($message['new_chat_participant'])) {
-          if ($message['new_chat_participant']['id'] == $this->botId) {
-            $chat->bot_added_to_chat($message);
-          }
-        } else if (isset($message['left_chat_participant'])) {
-          if ($message['left_chat_participant']['id'] == $this->botId) {
-            $chat->bot_kicked_from_chat($message);
-          }
-        } else {
-          $text = trim($message['text']);
-          $username = strtolower('@'.$this->botUsername);
-          $username_len = strlen($username);
-          if (strtolower(substr($text, 0, $username_len)) == $username) {
-            $text = trim(substr($text, $username_len));
-          }
-          if (preg_match('/^(?:\/([a-z0-9_]+)(@[a-z0-9_]+)?(?:\s+(.*))?)$/is', $text, $matches)) {
-            $command = $matches[1];
-            $command_owner = strtolower($matches[2]);
-            $command_params = $matches[3];
-            if (!$command_owner || $command_owner == $username) {
-              $method = 'command_'.$command;
-              if (method_exists($chat, $method)) {
-                $chat->$method($command_params, $message);
-              } else {
-                $chat->some_command($command, $command_params, $message);
-              }
-            }
-          } else {
-            $chat->message($text, $message);
-          }
-        }
-      }
+
+	if ($text == "/start") {
+			create_keyboard($this,$chat_id);
+			$log=$today. ";new chat started;" .$chat_id. "\n";
+			file_put_contents($logfile, $log, FILE_APPEND | LOCK_EX);
+		}
+		//richiedi previsioni meteo di oggi
+		elseif ($text == "/meteo" || $text == "meteo") {
+			$reply = "Previsioni Meteo per oggi " .$data->lamma_text("oggi").$data->biometeo_text("oggi");
+			$content = array('chat_id' => $chat_id, 'text' => $reply);
+			$this->request('sendMessage',$content);
+			$log=$today. ";meteo sent;" .$chat_id. "\n";
+			file_put_contents($logfile, $log, FILE_APPEND | LOCK_EX);
+			//aggiorna tastiera
+			create_keyboard($this,$chat_id);	
+			}
+		//richiede previsioni meteo di domani
+		elseif ($text == "/previsioni" || $text == "previsioni") {
+			$reply = "Previsioni Meteo per domani " .$data->lamma_text("domani").$data->biometeo_text("domani");
+			$content = array('chat_id' => $chat_id, 'text' => $reply);
+			$this->request('sendMessage',$content);
+			$log=$today. ";previsioni sent;" .$chat_id. "\n";
+			file_put_contents($logfile, $log, FILE_APPEND | LOCK_EX);
+			//aggiorna tastiera
+		   create_keyboard($this,$chat_id);
+		}
+		//richiede rischi di oggi a Prato
+		elseif ($text == "/rischi" || $text == "rischi") {
+			$reply = "Rischi di oggi:\r\n".$data->risk_text("oggi","B").$data->risk_text("oggi","R1");
+			$content = array('chat_id' => $chat_id, 'text' => $reply);
+			$this->request('sendMessage',$content);
+			$log=$today. ";rischi sent;" .$chat_id. "\n";
+			file_put_contents($logfile, $log, FILE_APPEND | LOCK_EX);
+			//aggiorna tastiera
+			create_keyboard($this,$chat_id);
+		}
+		//crediti
+		elseif ($text == "/crediti" || $text == "crediti") {
+			 $reply = "Applicazione sviluppata da Matteo Tempestini, dettagli e fonti dei dati presenti su : http://pratosmart.teo-soft.com/emergenzeprato/";
+			 $content = array('chat_id' => $chat_id, 'text' => $reply);
+			 $this->request('sendMessage',$content);
+			 $log=$today. ";crediti sent;" .$chat_id. "\n";
+			 file_put_contents($logfile, $log, FILE_APPEND | LOCK_EX);
+			 //aggiorna tastiera
+			 create_keyboard($this,$chat_id);
+		}
+		//richiede la temperatura
+		elseif ($text == "/temperatura" || $text == "temperatura") {
+	 
+			 create_keyboard_temp($this,$chat_id);	
+		}
+		elseif ($text =="Prato" || $text == "/temp-prato")
+		{
+			 $reply = "Temperatura misurata in zona Prato Est : " .$data->get_temperature("prato est");
+			 $content = array('chat_id' => $chat_id, 'text' => $reply);
+			$this->request('sendMessage',$content);
+			 $log=$today. ";temperatura Prato sent;" .$chat_id. "\n";
+			 file_put_contents($logfile, $log, FILE_APPEND | LOCK_EX);
+			 //aggiorna tastiera
+			 create_keyboard($this,$chat_id);
+		}
+		elseif ($text =="Vaiano/Sofignano" || $text == "/temp-vaianosofignano")
+		{
+			 $reply = "Temperatura misurata in zona Vaiano/Sofignano : " .$data->get_temperature("vaiano sofignano");
+			 $content = array('chat_id' => $chat_id, 'text' => $reply);
+			$this->request('sendMessage',$content);
+			 $log=$today. ";temperatura Vaiano/Sofignano sent;" .$chat_id. "\n";
+			 file_put_contents($logfile, $log, FILE_APPEND | LOCK_EX);
+			 //aggiorna tastiera
+			 create_keyboard($this,$chat_id);
+		}
+		elseif ($text =="Vaiano/Schignano" || $text == "/temp-vaianoschignano")
+		{
+			 $reply = "Temperatura misurata in zona Vaiano/Schignano : " .$data->get_temperature("vaiano schignano");
+			 $content = array('chat_id' => $chat_id, 'text' => $reply);
+			$this->request('sendMessage',$content);
+			 $log=$today. ";temperatura Vaiano/Schignano sent;" .$chat_id. "\n";
+			 file_put_contents($logfile, $log, FILE_APPEND | LOCK_EX);
+			 //aggiorna tastiera
+			 create_keyboard($this,$chat_id);
+		}
+		elseif ($text =="Montepiano/Vernio" || $text == "/temp-montepianovernio")
+		{
+			 $reply = "Temperatura misurata in zona Montepiano/Vernio : " .$data->get_temperature("montepiano vernio");
+			 $content = array('chat_id' => $chat_id, 'text' => $reply);
+			$this->request('sendMessage',$content);
+			 $log=$today. ";temperatura Montepiano/Vernio sent;" .$chat_id. "\n";
+			 file_put_contents($logfile, $log, FILE_APPEND | LOCK_EX);
+			 //aggiorna tastiera
+			 create_keyboard($this,$chat_id);
+		}
+		//comando errato
+		else{
+			 $reply = "Hai selezionato un comando non previsto. Per informazioni visita : http://pratosmart.teo-soft.com/emergenzeprato/";
+			 $content = array('chat_id' => $chat_id, 'text' => $reply);
+			$this->request('sendMessage',$content);
+			 $log=$today. ";wrong command sent;" .$chat_id. "\n";
+			 file_put_contents($logfile, $log, FILE_APPEND | LOCK_EX);	
+		 }
     }
   }
+
+
+// Crea la tastiera
+private function create_keyboard($telegram, $chat_id)
+{
+		$option = array(["meteo","previsioni"],["rischi", "temperatura"],["crediti"]);
+    	$keyb = $telegram->buildKeyBoard($option, $onetime=false);
+		$content = array('chat_id' => $chat_id, 'reply_markup' => $keyb, 'text' => "Seleziona un'opzione per essere aggiornato");
+		$telegram->request('sendMessage',$content);
+}
+
+//crea la tastiera per scegliere la zona temperatura
+private function create_keyboard_temp($telegram, $chat_id)
+{
+		$option = array(["Prato","Vaiano/Sofignano"],["Vaiano/Schignano", "Montepiano/Vernio"]);
+    	$keyb = $telegram->buildKeyBoard($option, $onetime=false);
+    	$content = array('chat_id' => $chat_id, 'reply_markup' => $keyb, 'text' => "Seleziona la zona di cui vuoi sapere la temperatura");
+		$telegram->request('sendMessage',$content);
+
+}
+
+private function buildKeyBoard(array $options, $onetime = true, $resize = true, $selective = true) {
+        $replyMarkup = array(
+            'keyboard' => $options,
+            'one_time_keyboard' => $onetime,
+            'resize_keyboard' => $resize,
+            'selective' => $selective
+        );
+        $encodedMarkup = json_encode($replyMarkup, true);
+        return $encodedMarkup;
+}
 
   protected function getChatInstance($chat_id) {
     if (!isset($this->chatInstances[$chat_id])) {
@@ -227,7 +319,6 @@ class TelegramBot extends TelegramBotCore {
 
 
 
-//gestione della chat
 abstract class TelegramBotChat {
 
   protected $core;
@@ -260,3 +351,4 @@ abstract class TelegramBotChat {
   }
 
 }
+?>
